@@ -38,11 +38,34 @@ class AuthUserStore:
         return res.data[0] if res.data else None
 
     @staticmethod
+    def get_by_id(user_id: str):
+        supabase = get_supabase_client()
+
+        res = supabase.table("auth_users") \
+            .select("*") \
+            .eq("id", user_id) \
+            .limit(1) \
+            .execute()
+
+        return res.data[0] if res.data else None
+
+    @staticmethod
     def update_password(user_id: str, password_hash: str):
         supabase = get_supabase_client()
 
         res = supabase.table("auth_users") \
             .update({"password_hash": password_hash}) \
+            .eq("id", user_id) \
+            .execute()
+
+        return res.data[0] if res.data else None
+
+    @staticmethod
+    def update_nickname(user_id: str, nickname: str):
+        supabase = get_supabase_client()
+
+        res = supabase.table("auth_users") \
+            .update({"nickname": nickname}) \
             .eq("id", user_id) \
             .execute()
 
