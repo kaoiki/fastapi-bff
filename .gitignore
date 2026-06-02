@@ -31,3 +31,10 @@ env/
 
 # uv
 .python-version
+
+# SSL keys
+key/
+
+# Generated docs
+auth-api-docs.md
+shop-api-docs.md
