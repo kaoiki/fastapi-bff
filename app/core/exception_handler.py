@@ -6,6 +6,18 @@ from app.core.response import fail
 from app.core.exceptions import AppException
 
 
+def _cors_json_response(status_code: int, content: dict) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
 
     # ✅ 业务异常（统一返回200）
@@ -16,7 +28,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message=exc.message,
             data=exc.data
         )
-        return JSONResponse(
+        return _cors_json_response(
             status_code=200,
             content=response.model_dump()
         )
@@ -29,7 +41,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message=exc.detail,
             data=None
         )
-        return JSONResponse(
+        return _cors_json_response(
             status_code=exc.status_code,
             content=response.model_dump()
         )
@@ -42,7 +54,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message="invalid request",
             data=exc.errors()
         )
-        return JSONResponse(
+        return _cors_json_response(
             status_code=400,
             content=response.model_dump()
         )
@@ -57,7 +69,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             message="internal server error",
             data=None
         )
-        return JSONResponse(
+        return _cors_json_response(
             status_code=500,
             content=response.model_dump()
         )

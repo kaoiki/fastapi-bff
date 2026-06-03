@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 
 from app.api.health import router as health_router
 from app.api.posts import router as posts_router
@@ -16,20 +16,33 @@ from app.core.exception_handler import register_exception_handlers
 
 # uv run uvicorn app.main:app --reload
 
-
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     debug=settings.debug
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.cors_allow_origins] if settings.cors_allow_origins != "*" else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    # 直接处理 OPTIONS 预检请求
+    if request.method == "OPTIONS":
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Max-Age": "86400",
+            }
+        )
+
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
 
 register_exception_handlers(app)
 

@@ -34,6 +34,7 @@ env/
 
 # SSL keys
 key/
+ssl/
 
 # Generated docs
 auth-api-docs.md
