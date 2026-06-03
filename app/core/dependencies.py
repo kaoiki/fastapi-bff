@@ -105,3 +105,16 @@ def require_app_user(required_app_code: str) -> Callable:
         return current_user
 
     return dependency
+
+
+# 知识库管理员用户 ID（MVP 硬编码，后续可改为配置）
+KNOWLEDGE_ADMIN_USER_ID = "f1ce03a5-4aa5-4531-b096-5798c25cc332"
+
+
+def require_knowledge_admin(
+    current_user: dict = Depends(get_current_user_base),
+):
+    if current_user["id"] != KNOWLEDGE_ADMIN_USER_ID:
+        raise AppException(code=403, message="Admin access required")
+
+    return current_user

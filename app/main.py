@@ -10,6 +10,7 @@ from app.api.game_list import router as game_list_router
 from app.api.leaderboard import router as leaderboard_router
 from app.api.shop import router as shop_router
 from app.api.services import router as services_router
+from app.api.knowledge import router as knowledge_router, admin_router as knowledge_admin_router
 from app.core.config import settings
 from app.core.exception_handler import register_exception_handlers
 
@@ -41,3 +42,5 @@ app.include_router(game_list_router)
 app.include_router(leaderboard_router)
 app.include_router(shop_router)
 app.include_router(services_router)
+app.include_router(knowledge_router)
+app.include_router(knowledge_admin_router)

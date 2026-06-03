@@ -182,6 +182,8 @@ class ServicesService:
                 "fee_type": item["fee_type"],
                 "is_verified": item.get("is_verified", False),
                 "provider_image": item.get("provider_image"),
+                "like_count": item.get("like_count", 0),
+                "dislike_count": item.get("dislike_count", 0),
                 "created_at": item["created_at"],
             })
 
@@ -224,6 +226,19 @@ class ServicesService:
 
         service_images = ServicesService._parse_images(service.get("service_images"))
 
+        # 登录用户查询其投票状态
+        user_vote = 0
+        if current_user:
+            vote_resp = (
+                supabase.table("service_votes")
+                .select("vote")
+                .eq("service_id", service_id)
+                .eq("user_id", current_user["id"])
+                .limit(1)
+                .execute()
+            )
+            user_vote = vote_resp.data[0]["vote"] if vote_resp.data else 0
+
         return {
             "id": service["id"],
             "user_id": service["user_id"],
@@ -241,6 +256,9 @@ class ServicesService:
             "provider_image": service.get("provider_image"),
             "service_images": service_images,
             "service_image_count": len(service_images),
+            "like_count": service.get("like_count", 0),
+            "dislike_count": service.get("dislike_count", 0),
+            "user_vote": user_vote,
             "is_owner": current_user is not None and current_user["id"] == service["user_id"],
             "created_at": service["created_at"],
             "updated_at": service["updated_at"],
@@ -496,6 +514,111 @@ class ServicesService:
             "image_count": len(next_images),
         }
 
+    # ── 赞 / 踩 / 取消投票 ──
+
+    @staticmethod
+    def vote_service(service_id: str, app_code: str, user_id: str, vote: int):
+        """赞/踩/取消投票"""
+        if vote not in (-1, 0, 1):
+            raise AppException(code=400, message="Invalid vote value. Must be -1, 0, or 1")
+
+        supabase = get_supabase_client()
+
+        # 确认服务存在
+        svc_resp = (
+            supabase.table("services")
+            .select("id, like_count, dislike_count")
+            .eq("id", service_id)
+            .eq("app_code", app_code)
+            .eq("is_deleted", False)
+            .limit(1)
+            .execute()
+        )
+
+        if not svc_resp.data:
+            raise AppException(code=404, message="Service not found")
+
+        # 查当前用户的投票记录
+        vote_resp = (
+            supabase.table("service_votes")
+            .select("id, vote")
+            .eq("service_id", service_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        existing = vote_resp.data[0] if vote_resp.data else None
+        old_vote = existing["vote"] if existing else 0
+
+        if old_vote == vote:
+            # 幂等：同一投票不变
+            return ServicesService._get_vote_result(service_id, user_id, vote)
+
+        # 更新 service_votes 表
+        now = datetime.now(timezone.utc).isoformat()
+        if vote == 0:
+            # 取消投票 → 删记录
+            if existing:
+                supabase.table("service_votes").delete().eq("id", existing["id"]).execute()
+        else:
+            if existing:
+                supabase.table("service_votes").update({"vote": vote, "updated_at": now}).eq("id", existing["id"]).execute()
+            else:
+                supabase.table("service_votes").insert({
+                    "service_id": service_id,
+                    "user_id": user_id,
+                    "vote": vote,
+                    "created_at": now,
+                    "updated_at": now,
+                }).execute()
+
+        # 计算并更新 count
+        like_delta = 0
+        dislike_delta = 0
+
+        if old_vote == 1:
+            like_delta -= 1
+        elif old_vote == -1:
+            dislike_delta -= 1
+
+        if vote == 1:
+            like_delta += 1
+        elif vote == -1:
+            dislike_delta += 1
+
+        if like_delta != 0 or dislike_delta != 0:
+            svc = svc_resp.data[0]
+            new_like = max(0, (svc.get("like_count") or 0) + like_delta)
+            new_dislike = max(0, (svc.get("dislike_count") or 0) + dislike_delta)
+            supabase.table("services").update({
+                "like_count": new_like,
+                "dislike_count": new_dislike,
+                "updated_at": now,
+            }).eq("id", service_id).execute()
+
+        return ServicesService._get_vote_result(service_id, user_id, vote)
+
+    @staticmethod
+    def _get_vote_result(service_id: str, user_id: str, vote: int):
+        """查最新 count 并返回结果"""
+        supabase = get_supabase_client()
+        r = supabase.table("services").select("like_count, dislike_count").eq("id", service_id).limit(1).execute()
+        svc = r.data[0] if r.data else {}
+        return {
+            "vote": vote,
+            "like_count": svc.get("like_count", 0),
+            "dislike_count": svc.get("dislike_count", 0),
+        }
+
+    @staticmethod
+    def get_vote_status(service_id: str, user_id: str):
+        """查询当前用户投票状态"""
+        supabase = get_supabase_client()
+        r = supabase.table("service_votes").select("vote").eq("service_id", service_id).eq("user_id", user_id).limit(1).execute()
+        vote = r.data[0]["vote"] if r.data else 0
+        return {"vote": vote}
+
     @staticmethod
     def list_my_services(app_code: str, user_id: str, page: int = 1, page_size: int = 12):
         supabase = get_supabase_client()
@@ -543,6 +666,8 @@ class ServicesService:
                 "is_verified": item.get("is_verified", False),
                 "status": item.get("status", 0),
                 "provider_image": item.get("provider_image"),
+                "like_count": item.get("like_count", 0),
+                "dislike_count": item.get("dislike_count", 0),
                 "created_at": item["created_at"],
             })
 

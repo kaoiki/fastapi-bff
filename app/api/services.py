@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 from app.core.context import get_app_code
 from app.core.dependencies import get_current_user_base
 from app.core.response import fail, success
-from app.schemas.services import CreateServiceRequest, UpdateServiceRequest
+from app.schemas.services import CreateServiceRequest, UpdateServiceRequest, VoteRequest
 from app.services.services_service import ServicesService
 
 router = APIRouter(prefix="/api/services", tags=["services"])
@@ -222,4 +222,38 @@ def delete_service_image(
     if result.get("error") == "image_not_found":
         return fail(code=404, message="Image not found", data=None)
 
+    return success(data=result)
+
+
+# ── 赞 / 踩（需登录） ──
+
+@router.post("/{service_id}/vote")
+def vote_service(
+    service_id: str,
+    req: VoteRequest,
+    app_code: str = Depends(get_app_code),
+    current_user: dict = Depends(get_current_user_base),
+):
+    """赞(1) / 踩(-1) / 取消(0)"""
+    result = ServicesService.vote_service(
+        service_id=service_id,
+        app_code=app_code,
+        user_id=current_user["id"],
+        vote=req.vote,
+    )
+    return success(data=result)
+
+
+# ── 查询当前用户投票状态（需登录） ──
+
+@router.get("/{service_id}/vote/status")
+def get_vote_status(
+    service_id: str,
+    app_code: str = Depends(get_app_code),
+    current_user: dict = Depends(get_current_user_base),
+):
+    result = ServicesService.get_vote_status(
+        service_id=service_id,
+        user_id=current_user["id"],
+    )
     return success(data=result)

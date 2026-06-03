@@ -33,3 +33,7 @@ class UpdateServiceRequest(BaseModel):
     available_time: Optional[str] = None
     fee_type: Optional[str] = None
     provider_image: Optional[str] = None
+
+
+class VoteRequest(BaseModel):
+    vote: int
