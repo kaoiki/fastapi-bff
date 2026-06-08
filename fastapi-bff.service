@@ -1,0 +1,13 @@
+[Unit]
+Description=FastAPI BFF
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/fastapi-bff
+ExecStart=/root/.local/bin/uv run gunicorn app.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:2248 -w 4 --certfile ssl/full_chain.pem --keyfile ssl/private_2026.key
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
