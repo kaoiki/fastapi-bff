@@ -18,7 +18,8 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /opt/fastapi-bff
+            git stash
             git pull origin master
-            uv sync --frozen
+            /root/miniconda3/envs/fastbff/bin/uv sync --frozen
             sudo systemctl restart fastapi-bff
             sudo systemctl status fastapi-bff
