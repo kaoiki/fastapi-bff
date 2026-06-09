@@ -29,7 +29,7 @@ class SettingsService:
         return {
             "nickname": user.get("nickname", ""),
             "avatar": user.get("avatar", ""),
-            "bio": None,
+            "bio": user.get("bio") or None,
             "google_bound": False,
         }
 
@@ -43,6 +43,8 @@ class SettingsService:
             if not nickname:
                 raise AppException(code=400, message="Nickname is required")
             update_data["nickname"] = nickname
+        if bio is not None:
+            update_data["bio"] = bio.strip() if bio.strip() else ""
 
         if not update_data:
             raise AppException(code=400, message="No fields to update")
@@ -61,7 +63,7 @@ class SettingsService:
 
         return {
             "nickname": rows[0].get("nickname", ""),
-            "bio": None,
+            "bio": rows[0].get("bio") or None,
         }
 
     @staticmethod
