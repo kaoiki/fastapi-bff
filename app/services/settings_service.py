@@ -13,7 +13,7 @@ class SettingsService:
 
         result = (
             supabase.table("auth_users")
-            .select("id, email, nickname, avatar, status")
+            .select("id, email, nickname, avatar, bio, status")
             .eq("id", user_id)
             .eq("app_code", app_code)
             .limit(1)
