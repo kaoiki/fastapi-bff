@@ -22,19 +22,3 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
-class UpdateNicknameRequest(BaseModel):
-    nickname: str
-
-
-class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
-
-
-class UpdateNicknameRequest(BaseModel):
-    nickname: str
-
-
-class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
