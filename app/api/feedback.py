@@ -50,6 +50,14 @@ def _resolve_user_id(authorization: str, app_code: str):
     return session["user_id"]
 
 
+@router.get("/stats")
+def get_feedback_stats(
+    app_code: str = Depends(get_app_code),
+):
+    data = FeedbackService.get_stats(app_code)
+    return success(data=data)
+
+
 @router.post("")
 def submit_feedback(
     req: GameFeedbackRequest,
