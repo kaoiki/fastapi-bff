@@ -12,7 +12,7 @@ class CoursesService:
 
         courses_resp = (
             supabase.table("courses")
-            .select("id, name, language_code, description, level, icon, author")
+            .select("id, name, language_code, description, level, icon, type, author")
             .eq("app_code", app_code)
             .eq("status", 1)
             .order("sort", desc=False)
@@ -98,6 +98,7 @@ class CoursesService:
                 "total_lessons": total_lessons,
                 "current_lesson": current_lesson,
                 "icon": course.get("icon", "menu_book"),
+                "type": course.get("type", "vocabulary"),
                 "author": course.get("author", "Platform"),
             })
 

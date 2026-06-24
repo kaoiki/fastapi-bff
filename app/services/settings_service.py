@@ -13,7 +13,7 @@ class SettingsService:
 
         result = (
             supabase.table("auth_users")
-            .select("id, email, nickname, avatar, bio, status")
+            .select("id, email, nickname, avatar, bio, status, native_language")
             .eq("id", user_id)
             .eq("app_code", app_code)
             .limit(1)
@@ -30,11 +30,12 @@ class SettingsService:
             "nickname": user.get("nickname", ""),
             "avatar": user.get("avatar", ""),
             "bio": user.get("bio") or None,
+            "native_language": user.get("native_language") or None,
             "google_bound": False,
         }
 
     @staticmethod
-    def update_profile(user_id: str, app_code: str, nickname: str = None, bio: str = None) -> dict:
+    def update_profile(user_id: str, app_code: str, nickname: str = None, bio: str = None, native_language: str = None) -> dict:
         supabase = get_supabase_client()
 
         update_data = {}
@@ -45,6 +46,8 @@ class SettingsService:
             update_data["nickname"] = nickname
         if bio is not None:
             update_data["bio"] = bio.strip() if bio.strip() else ""
+        if native_language is not None:
+            update_data["native_language"] = native_language.strip()
 
         if not update_data:
             raise AppException(code=400, message="No fields to update")
@@ -64,6 +67,7 @@ class SettingsService:
         return {
             "nickname": rows[0].get("nickname", ""),
             "bio": rows[0].get("bio") or None,
+            "native_language": rows[0].get("native_language") or None,
         }
 
     @staticmethod

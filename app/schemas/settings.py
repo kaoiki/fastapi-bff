@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class UpdateProfileRequest(BaseModel):
     nickname: Optional[str] = Field(None, min_length=1)
     bio: Optional[str] = None
+    native_language: Optional[str] = None
 
 
 class ChangePasswordRequest(BaseModel):

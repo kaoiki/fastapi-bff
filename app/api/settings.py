@@ -32,6 +32,7 @@ def update_profile(
         app_code=app_code,
         nickname=req.nickname,
         bio=req.bio,
+        native_language=req.native_language,
     )
     return success(data=data)
 
