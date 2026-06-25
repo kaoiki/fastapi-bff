@@ -15,6 +15,8 @@ from app.api.settings import router as settings_router
 from app.api.feedback import router as feedback_router
 from app.api.feedback_generic import router as feedback_generic_router
 from app.api.courses import router as courses_router
+from app.api.lessons import router as lessons_router
+from app.api.stats import router as stats_router
 from app.core.config import settings
 from app.core.exception_handler import register_exception_handlers
 
@@ -65,3 +67,5 @@ app.include_router(settings_router)
 app.include_router(feedback_router)
 app.include_router(feedback_generic_router)
 app.include_router(courses_router)
+app.include_router(lessons_router)
+app.include_router(stats_router)
