@@ -137,6 +137,27 @@ class CoursesService:
         for row in (progress_resp.data or []):
             progress_map[row["lesson_id"]] = row["is_completed"]
 
+        # 取每个 lesson 最后一次记录的准确率
+        accuracy_map = {}
+        if lesson_ids:
+            records_resp = (
+                supabase.table("lesson_records")
+                .select("lesson_id, correct_count, wrong_count, completed_at")
+                .eq("user_id", user_id)
+                .in_("lesson_id", lesson_ids)
+                .order("completed_at", desc=True)
+                .execute()
+            )
+            seen = set()
+            for r in (records_resp.data or []):
+                lid = r["lesson_id"]
+                if lid not in seen:
+                    seen.add(lid)
+                    correct = r.get("correct_count", 0) or 0
+                    wrong = r.get("wrong_count", 0) or 0
+                    total_q = correct + wrong
+                    accuracy_map[lid] = round(correct / total_q * 100) if total_q > 0 else 0
+
         result = []
         for i, lesson in enumerate(lessons):
             lid = lesson["id"]
@@ -155,6 +176,7 @@ class CoursesService:
                 "description": lesson.get("description", ""),
                 "sequence": i + 1,
                 "status": status,
+                "accuracy": accuracy_map.get(lid, 0),
             })
 
         return result

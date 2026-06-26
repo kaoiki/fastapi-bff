@@ -9,12 +9,12 @@ class StatsService:
     def get_stats(user_id: str, app_code: str) -> dict:
         supabase = get_supabase_client()
 
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
         # 所有 records
         records_resp = (
             supabase.table("lesson_records")
-            .select("xp_earned, coins_earned, total_questions, time_seconds, completed_at")
+            .select("xp_earned, coins_earned, total_questions, correct_count, wrong_count, time_seconds, completed_at")
             .eq("user_id", user_id)
             .order("completed_at", desc=True)
             .execute()
@@ -28,6 +28,10 @@ class StatsService:
         total_lessons = len(all_records)
         total_words = sum(r.get("total_questions", 0) or 0 for r in all_records)
         total_time = sum(r.get("time_seconds", 0) or 0 for r in all_records)
+        total_correct = sum(r.get("correct_count", 0) or 0 for r in all_records)
+        total_wrong = sum(r.get("wrong_count", 0) or 0 for r in all_records)
+        total_q = total_correct + total_wrong
+        total_accuracy = round(total_correct / total_q * 100) if total_q > 0 else 0
 
         # 今日数据
         today_records = [r for r in all_records if r.get("completed_at", "") >= today_start]
@@ -68,6 +72,7 @@ class StatsService:
         return {
             "total_xp": total_xp,
             "total_coins": total_coins,
+            "total_accuracy": total_accuracy,
             "total_lessons": total_lessons,
             "total_defeated": total_lessons,
             "total_words_typed": total_words,

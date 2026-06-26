@@ -38,48 +38,63 @@ class LessonService:
 
         lesson = lesson_resp.data[0]
 
-        # 查是否已学过
-        progress_resp = (
-            supabase.table("user_lesson_progress")
-            .select("is_completed")
+        # 查旧记录（每人每 lesson 最多一条）
+        old_resp = (
+            supabase.table("lesson_records")
+            .select("id, correct_count, wrong_count, xp_earned, coins_earned")
             .eq("user_id", user_id)
             .eq("lesson_id", lesson_id)
             .limit(1)
             .execute()
         )
 
-        already_completed = progress_resp.data and progress_resp.data[0].get("is_completed")
+        old_record = old_resp.data[0] if old_resp.data else None
 
-        if already_completed:
-            # 再次学习：不发奖励，不写记录
-            user_r = supabase.table("auth_users").select("total_xp").eq("id", user_id).limit(1).execute()
-            current_xp = user_r.data[0].get("total_xp", 0) if user_r.data else 0
-            return {
-                "xp_earned": 0,
-                "coins_earned": 0,
-                "total_xp": current_xp,
-                "lesson_status": "completed",
-                "next_lesson_status": None,
-            }
+        # 检查已有记录：准确率 ≥ 50% 则拒绝
+        if old_record:
+            old_total = (old_record.get("correct_count", 0) or 0) + (old_record.get("wrong_count", 0) or 0)
+            old_accuracy = old_record.get("correct_count", 0) / old_total if old_total > 0 else 0
+            if old_accuracy >= 0.5:
+                raise AppException(code=400, message="Lesson already passed, no rewards available")
 
-        # 计算奖励
-        xp_earned, coins_earned = _calc_reward(correct_count, wrong_count)
+        # 计算本次奖励
+        xp_new, coins_new = _calc_reward(correct_count, wrong_count)
         now = datetime.now(timezone.utc).isoformat()
 
-        # 写入 lesson_records
-        supabase.table("lesson_records").insert({
-            "user_id": user_id,
-            "lesson_id": lesson_id,
-            "correct_count": correct_count,
-            "wrong_count": wrong_count,
-            "total_questions": total_questions,
-            "time_seconds": time_seconds,
-            "xp_earned": xp_earned,
-            "coins_earned": coins_earned,
-            "completed_at": now,
-        }).execute()
+        if old_record:
+            # retry：更新记录，补 XP/Coin 差值
+            xp_old = old_record.get("xp_earned", 0) or 0
+            coins_old = old_record.get("coins_earned", 0) or 0
+            xp_delta = xp_new - xp_old
+            coins_delta = coins_new - coins_old
 
-        # 更新 auth_users：读取当前值 + 累加
+            supabase.table("lesson_records").update({
+                "correct_count": correct_count,
+                "wrong_count": wrong_count,
+                "total_questions": total_questions,
+                "time_seconds": time_seconds,
+                "xp_earned": xp_new,
+                "coins_earned": coins_new,
+                "completed_at": now,
+            }).eq("id", old_record["id"]).execute()
+        else:
+            # 首次：插入新记录，全部算奖励
+            xp_delta = xp_new
+            coins_delta = coins_new
+
+            supabase.table("lesson_records").insert({
+                "user_id": user_id,
+                "lesson_id": lesson_id,
+                "correct_count": correct_count,
+                "wrong_count": wrong_count,
+                "total_questions": total_questions,
+                "time_seconds": time_seconds,
+                "xp_earned": xp_new,
+                "coins_earned": coins_new,
+                "completed_at": now,
+            }).execute()
+
+        # 更新 auth_users
         user_resp = (
             supabase.table("auth_users")
             .select("total_xp, coins")
@@ -91,16 +106,16 @@ class LessonService:
         user_data = user_resp.data[0] if user_resp.data else {}
         current_xp = user_data.get("total_xp", 0) or 0
         current_coins = user_data.get("coins", 0) or 0
-        new_xp = current_xp + xp_earned
-        new_coins = current_coins + coins_earned
+        new_xp_total = current_xp + xp_delta
+        new_coins_total = current_coins + coins_delta
 
         supabase.table("auth_users").update({
-            "total_xp": new_xp,
-            "coins": new_coins,
+            "total_xp": new_xp_total,
+            "coins": new_coins_total,
         }).eq("id", user_id).execute()
 
         # 更新 user_lesson_progress
-        existing_progress = (
+        progress_resp = (
             supabase.table("user_lesson_progress")
             .select("id, finish_count")
             .eq("user_id", user_id)
@@ -109,13 +124,15 @@ class LessonService:
             .execute()
         )
 
-        if existing_progress.data:
+        if progress_resp.data:
+            prev = progress_resp.data[0]
+            new_best = max(correct_count, prev.get("best_score", 0) or 0)
             supabase.table("user_lesson_progress").update({
                 "is_completed": True,
-                "best_score": correct_count,
-                "finish_count": existing_progress.data[0].get("finish_count", 0) + 1,
+                "best_score": new_best,
+                "finish_count": (prev.get("finish_count", 0) or 0) + 1,
                 "last_finished_at": now,
-            }).eq("id", existing_progress.data[0]["id"]).execute()
+            }).eq("id", prev["id"]).execute()
         else:
             supabase.table("user_lesson_progress").insert({
                 "user_id": user_id,
@@ -143,9 +160,9 @@ class LessonService:
             next_lesson_status = "available"
 
         return {
-            "xp_earned": xp_earned,
-            "coins_earned": coins_earned,
-            "total_xp": new_xp,
+            "xp_earned": xp_delta,
+            "coins_earned": coins_delta,
+            "total_xp": new_xp_total,
             "lesson_status": "completed",
             "next_lesson_status": next_lesson_status,
         }
