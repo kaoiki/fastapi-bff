@@ -144,6 +144,31 @@ class LessonService:
                 "last_finished_at": now,
             }).execute()
 
+        # 写入 checkin
+        course_id = lesson["course_id"]
+        old_accuracy = 0
+        if old_record:
+            old_total = (old_record.get("correct_count", 0) or 0) + (old_record.get("wrong_count", 0) or 0)
+            old_accuracy = round((old_record.get("correct_count", 0) or 0) / old_total * 100) if old_total > 0 else 0
+
+        if not old_record:
+            checkin_type = "learned"
+        else:
+            this_accuracy = round(correct_count / (correct_count + wrong_count) * 100) if (correct_count + wrong_count) > 0 else 0
+            checkin_type = "reviewed" if this_accuracy >= 50 else "retried"
+
+        checkin_accuracy = round(correct_count / (correct_count + wrong_count) * 100) if (correct_count + wrong_count) > 0 else 0
+        supabase.table("checkins").insert({
+            "user_id": user_id,
+            "lesson_id": lesson_id,
+            "course_id": course_id,
+            "type": checkin_type,
+            "accuracy": checkin_accuracy,
+            "time_seconds": time_seconds,
+            "xp_earned": xp_delta,
+            "coins_earned": coins_delta,
+        }).execute()
+
         # 查下一课状态
         next_lesson_status = None
         next_resp = (
