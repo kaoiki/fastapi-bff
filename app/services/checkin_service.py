@@ -112,6 +112,9 @@ class CheckinService:
     def toggle_cheer(checkin_id: str, user_id: str) -> dict:
         supabase = get_supabase_client()
 
+        # 清理可能的空白字符
+        checkin_id = checkin_id.strip()
+
         # 确认 checkin 存在
         checkin_resp = (
             supabase.table("checkins")
@@ -122,6 +125,7 @@ class CheckinService:
         )
 
         if not checkin_resp.data:
+            print(f"[cheer] checkin not found: {checkin_id}")
             raise AppException(code=404, message="Checkin not found")
 
         # 不能给自己加油

@@ -18,6 +18,8 @@ from app.api.courses import router as courses_router
 from app.api.lessons import router as lessons_router
 from app.api.stats import router as stats_router
 from app.api.checkins import router as checkins_router
+from app.api.achievements import router as achievements_router
+from app.api.feed import router as feed_router
 from app.core.config import settings
 from app.core.exception_handler import register_exception_handlers
 
@@ -71,3 +73,5 @@ app.include_router(courses_router)
 app.include_router(lessons_router)
 app.include_router(stats_router)
 app.include_router(checkins_router)
+app.include_router(achievements_router)
+app.include_router(feed_router)

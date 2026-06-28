@@ -50,14 +50,54 @@ class LessonService:
 
         old_record = old_resp.data[0] if old_resp.data else None
 
-        # 检查已有记录：准确率 ≥ 50% 则拒绝
+        # Review 检查：已有记录 ≥ 50% 则只打 checkin，不发奖励
+        is_review = False
         if old_record:
             old_total = (old_record.get("correct_count", 0) or 0) + (old_record.get("wrong_count", 0) or 0)
             old_accuracy = old_record.get("correct_count", 0) / old_total if old_total > 0 else 0
             if old_accuracy >= 0.5:
-                raise AppException(code=400, message="Lesson already passed, no rewards available")
+                is_review = True
 
-        # 计算本次奖励
+        if is_review:
+            # review：只打 checkin，不发奖励
+            checkin_type = "reviewed"
+            course_id = lesson["course_id"]
+            checkin_accuracy = round(correct_count / (correct_count + wrong_count) * 100) if (correct_count + wrong_count) > 0 else 0
+            supabase.table("checkins").insert({
+                "user_id": user_id,
+                "lesson_id": lesson_id,
+                "course_id": course_id,
+                "type": checkin_type,
+                "accuracy": checkin_accuracy,
+                "time_seconds": time_seconds,
+                "xp_earned": 0,
+                "coins_earned": 0,
+            }).execute()
+
+            # 检查成就
+            from app.services.achievement_service import AchievementService
+            total_attempts = correct_count + wrong_count
+            current_accuracy = correct_count / total_attempts if total_attempts > 0 else 0
+            new_achievements = AchievementService.check_new_achievements(
+                user_id=user_id, app_code=app_code, lesson_id=lesson_id, course_id=course_id,
+                correct_count=correct_count, wrong_count=wrong_count,
+                time_seconds=time_seconds, accuracy=current_accuracy,
+            )
+
+            # 查总 XP
+            user_r = supabase.table("auth_users").select("total_xp").eq("id", user_id).limit(1).execute()
+            total_xp = user_r.data[0].get("total_xp", 0) if user_r.data else 0
+
+            return {
+                "xp_earned": 0,
+                "coins_earned": 0,
+                "total_xp": total_xp,
+                "lesson_status": "completed",
+                "next_lesson_status": None,
+                "new_achievements": new_achievements,
+            }
+
+        # 正常流程（首次 / retry）
         xp_new, coins_new = _calc_reward(correct_count, wrong_count)
         now = datetime.now(timezone.utc).isoformat()
 
@@ -144,6 +184,10 @@ class LessonService:
                 "last_finished_at": now,
             }).execute()
 
+        # 计算本次准确率供成就使用
+        total_attempts = correct_count + wrong_count
+        current_accuracy = correct_count / total_attempts if total_attempts > 0 else 0
+
         # 写入 checkin
         course_id = lesson["course_id"]
         old_accuracy = 0
@@ -169,6 +213,19 @@ class LessonService:
             "coins_earned": coins_delta,
         }).execute()
 
+        # 检查成就
+        from app.services.achievement_service import AchievementService
+        new_achievements = AchievementService.check_new_achievements(
+            user_id=user_id,
+            app_code=app_code,
+            lesson_id=lesson_id,
+            course_id=course_id,
+            correct_count=correct_count,
+            wrong_count=wrong_count,
+            time_seconds=time_seconds,
+            accuracy=current_accuracy,
+        )
+
         # 查下一课状态
         next_lesson_status = None
         next_resp = (
@@ -190,4 +247,5 @@ class LessonService:
             "total_xp": new_xp_total,
             "lesson_status": "completed",
             "next_lesson_status": next_lesson_status,
+            "new_achievements": new_achievements,
         }
